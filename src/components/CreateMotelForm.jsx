@@ -16,8 +16,10 @@ import { Input } from "@/components/ui/input";
 import { axiosInstance } from "@/configs/axiosConfig";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
+  const [selectedImages, setSelectedImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -31,8 +33,25 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
   });
 
   const onSubmit = async (data) => {
+    const uploadPromises = selectedImages.map((image) => {
+      const formData = new FormData();
+      formData.append("file", image.file);
+      formData.append("upload_preset", import.meta.env.VITE_CLOUDINARY_PRESET);
+      formData.append("cloud_name", import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
+      formData.append("api_key", import.meta.env.VITE_CLOUDINARY_API_KEY);
+
+      return axios.post(
+        "https://api.cloudinary.com/v1_1/dmcqr73g4/image/upload",
+        formData
+      );
+    });
+
     try {
       setLoading(true);
+      const resCloudinary = await Promise.all(uploadPromises);
+      const uploadedUrls = resCloudinary.map((response) => ({
+        path: response.data.secure_url,
+      }));
 
       const dataSubmit = {
         userId: 1, // 1 is id of no user
@@ -46,6 +65,14 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
 
       const res = await axiosInstance.post("Motels", dataSubmit);
 
+      console.log({ uploadedUrls });
+      if (uploadedUrls.length > 0) {
+        const res2 = await axiosInstance.post(
+          `Motels/${res.data.id}/images`,
+          uploadedUrls
+        );
+      }
+
       toast({
         title: "Cập nhật thành công",
         description: "Thông tin nhà trọ đã được hệ thống ghi nhận",
@@ -58,6 +85,22 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
     }
   };
 
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files);
+
+    // Convert files to preview-able URLs
+    const newImages = files.map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+
+    setSelectedImages((prevImages) => [...prevImages, ...newImages]);
+  };
+
+  const handleRemoveImage = (index) => {
+    setSelectedImages((prevImages) => prevImages.filter((_, i) => i !== index));
+  };
+
   return (
     <>
       <Form {...form}>
@@ -68,7 +111,7 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tên</FormLabel>
+                  <FormLabel>Tên nhà trọ:</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -86,7 +129,7 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mô tả</FormLabel>
+                  <FormLabel>Mô tả:</FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
@@ -97,6 +140,46 @@ function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="images"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hình ảnh:</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {/* Image Previews */}
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              {selectedImages.map((image, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={image.preview}
+                    alt={`Preview ${index}`}
+                    className="w-32 h-32 object-cover rounded-lg shadow-md"
+                  />
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(index)}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           <Button type="submit" className="w-full">

@@ -5,6 +5,8 @@ import "lightgallery/css/lg-thumbnail.css";
 // import lgThumbnail from "lightgallery/plugins/thumbnail";
 // import lgZoom from "lightgallery/plugins/zoom";
 
+import L from "leaflet";
+
 import {
   Popover,
   PopoverContent,
@@ -13,7 +15,15 @@ import {
 
 import { axiosInstance } from "@/configs/axiosConfig";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON, Circle } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  GeoJSON,
+  Circle,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
 import LightGallery from "lightgallery/react";
 
 import {
@@ -32,6 +42,7 @@ import NearbyPoints from "@/components/NearbyPoints";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getGeoJsonData } from "@/helpers";
+import DistanceMachine from "@/components/DistanceMachine";
 
 function HomePage() {
   const [currentRoom, setCurrentRoom] = useState();
@@ -44,6 +55,12 @@ function HomePage() {
   const [endPoint, setEndPoint] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [radius, setRadius] = useState(null);
+
+  const [firstPoint, setFirstPoint] = useState(null);
+  const [editingFirstPoint, setEditingFirstPoint] = useState(false);
+  const [secondPoint, setSecondPoint] = useState(null);
+  const [editingSecondPoint, setEditingSecondPoint] = useState(false);
+  const [distance, setDistance] = useState();
 
   useEffect(() => {
     // Try to get user location if allowed
@@ -152,7 +169,6 @@ function HomePage() {
   };
 
   const handleClickFindRoute = (event) => {
-    console.log(event.target.getAttribute("data-destination"));
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -168,6 +184,17 @@ function HomePage() {
           console.error("Error getting location:", error.message);
         }
       );
+    }
+  };
+
+  const handleClickFindDistance = (event) => {
+    event.preventDefault();
+
+    if (firstPoint && secondPoint) {
+      const point1 = L.latLng(firstPoint.lat, firstPoint.lng);
+      const point2 = L.latLng(secondPoint.lat, secondPoint.lng);
+      const calculatedDistance = point1.distanceTo(point2);
+      setDistance(calculatedDistance);
     }
   };
 
@@ -190,6 +217,15 @@ function HomePage() {
         )}
         <RoutingMachine start={startPoint} end={endPoint} />
 
+        <DistanceMachine
+          editingFirstPoint={editingFirstPoint}
+          editingSecondPoint={editingSecondPoint}
+          setEditingFirstPoint={setEditingFirstPoint}
+          setEditingSecondPoint={setEditingSecondPoint}
+          setFirstPoint={setFirstPoint}
+          setSecondPoint={setSecondPoint}
+        />
+
         {userLocation && radius && (
           <>
             <NearbyPoints
@@ -210,6 +246,28 @@ function HomePage() {
             />
           </>
         )}
+
+        {firstPoint && (
+          <Marker position={[firstPoint.lat, firstPoint.lng]}>
+            <Popup>Vị trí thứ 1</Popup>
+          </Marker>
+        )}
+
+        {secondPoint && (
+          <Marker position={[secondPoint.lat, secondPoint.lng]}>
+            <Popup>Vị trí thứ 2</Popup>
+          </Marker>
+        )}
+
+        {distance && (
+          <Polyline
+            positions={[
+              [firstPoint.lat, firstPoint.lng],
+              [secondPoint.lat, secondPoint.lng],
+            ]}
+            color="blue"
+          />
+        )}
       </MapContainer>
 
       <div className="absolute left-0 top-0">
@@ -220,8 +278,7 @@ function HomePage() {
                 <SheetHeader>
                   <img
                     style={{ fontSize: "14px", color: "#6b7280" }}
-                    src="https://github.com/shadcn.png"
-                    // src={currentRoom.motel.images[0]}
+                    src={currentRoom.motel.images[0].path}
                     alt="room image"
                     className="w-full h-72 object-cover mt-4"
                   />
@@ -260,8 +317,7 @@ function HomePage() {
                       {currentRoom.motel.images.map((img, index) => (
                         <img
                           key={index + "_image_key"}
-                          // src={img}
-                          src="https://github.com/shadcn.png"
+                          src={img.path}
                           alt="Hình ảnh nhà trọ"
                           className="w-40 h-40 object-cover"
                           onClick={() => handleClickImage(index)}
@@ -277,10 +333,8 @@ function HomePage() {
                     zoom={{ scale: 1.5, enableZoomAfter: 100 }}
                     dynamicEl={currentRoom?.motel?.images.map(
                       (image, index) => ({
-                        // src: image.path,
-                        // thumb: image.path,
-                        src: "https://github.com/shadcn.png",
-                        thumb: "https://github.com/shadcn.png",
+                        src: image.path,
+                        thumb: image.path,
                         subHtml: `<h4>Image ${index + 1} title</h4><p>Image ${
                           index + 1
                         } descriptions.</p>`,
@@ -322,6 +376,52 @@ function HomePage() {
                 Hủy bán kính
               </Button>
             </div>
+          </form>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button className="absolute top-4 left-[414px]">
+            Tính khoảng cách
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent>
+          <form
+            onSubmit={handleClickFindDistance}
+            className="flex flex-col items-center gap-3"
+          >
+            <div className="flex gap-3">
+              <Input name="firstPoint" disabled value={firstPoint || ""} />
+              <Button type="button" onClick={(e) => setEditingFirstPoint(true)}>
+                Chọn vị trí thứ 1
+              </Button>
+            </div>
+
+            <div className="flex gap-3">
+              <Input name="secondPoint" disabled value={secondPoint || ""} />
+              <Button
+                type="button"
+                onClick={(e) => setEditingSecondPoint(true)}
+              >
+                Chọn vị trí thứ 2
+              </Button>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Input name="result" disabled value={distance || ""} />
+              <Button type="submit">Tìm</Button>
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={(e) => {
+                setFirstPoint(null);
+                setSecondPoint(null);
+                setDistance(null);
+              }}
+            >
+              Hủy
+            </Button>
           </form>
         </PopoverContent>
       </Popover>
