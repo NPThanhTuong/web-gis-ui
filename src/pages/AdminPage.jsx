@@ -35,24 +35,35 @@ import { Clipboard } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MapClickPopup from "@/components/event/MapClickPopup";
 import { toast } from "@/hooks/use-toast";
+import CreateMotelForm from "@/components/CreateMotelForm";
+import { useNavigate } from "react-router-dom";
+import CreateRoomForm from "@/components/CreateRoomForm";
+import DrawPolygonControl from "@/components/DrawPolygonControl";
+import UpdateRoomForm from "@/components/UpdateRoomForm";
 
 function AdminPage() {
   const [roomGeoJson, setRoomGeoJson] = useState();
   const [motelGeoJson, setMotelGeoJson] = useState();
   const [loading, setLoading] = useState(true);
-  const [features, setFeatures] = useState([]);
   const [currentAddFeature, setCurrentAddFeature] = useState();
   const [currentEditMotel, setCurrentEditMotel] = useState();
+  const [currentEditRoom, setCurrentEditRoom] = useState();
   const [currentDeleteMotelId, setCurrentDeleteMotelId] = useState(0);
+  const [currentDeleteRoomId, setCurrentDeleteRoomId] = useState(0);
 
   const [clickPos, setClickPos] = useState();
   const [updateMotelPosition, setUpdateMotelPosition] = useState();
+  const [updateRoomPosition, setUpdateRoomPosition] = useState();
 
   const [openAddRoomDialog, setOpenAddRoomDialog] = useState(false);
-  const [openAddMotelDialog, setOpenAddMotelDialog] = useState(false);
+  const [openUpdateMotelDialog, setOpenUpdateMotelDialog] = useState(false);
+  const [openUpdateRoomDialog, setOpenUpdateRoomDialog] = useState(false);
   const [openDeleteMotelDialog, setOpenDeleteMotelDialog] = useState(false);
+  const [openDeleteRoomDialog, setOpenDeleteRoomDialog] = useState(false);
+  const [openCreateMotelDialog, setOpenCreateMotelDialog] = useState(false);
+  const [openCreateRoomDialog, setOpenCreateRoomDialog] = useState(false);
 
-  const [parentMapKey, setParentMapKey] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const getRooms = async () => {
@@ -75,25 +86,26 @@ function AdminPage() {
   }, []);
 
   const addFeature = useCallback((newFeature) => {
-    setFeatures((prevFeatures) => [...prevFeatures, newFeature]);
-    setOpenAddMotelDialog(true);
+    if (newFeature.geometry.type === "Point") setOpenCreateMotelDialog(true);
+    else setOpenCreateRoomDialog(true);
     setCurrentAddFeature(newFeature);
+    console.log(newFeature);
   }, []);
 
   const updateFeature = useCallback((updatedFeature) => {
-    setFeatures((prevFeatures) =>
-      prevFeatures.map((feature) =>
-        feature.properties.id === updatedFeature.properties.id
-          ? updatedFeature
-          : feature
-      )
-    );
+    // setFeatures((prevFeatures) =>
+    //   prevFeatures.map((feature) =>
+    //     feature.properties.id === updatedFeature.properties.id
+    //       ? updatedFeature
+    //       : feature
+    //   )
+    // );
   }, []);
 
   const deleteFeature = useCallback((featureId) => {
-    setFeatures((prevFeatures) =>
-      prevFeatures.filter((feature) => feature.properties.id !== featureId)
-    );
+    // setFeatures((prevFeatures) =>
+    //   prevFeatures.filter((feature) => feature.properties.id !== featureId)
+    // );
   }, []);
 
   const handleClickUpdateMotelPopup = async (event) => {
@@ -102,11 +114,30 @@ function AdminPage() {
       const res = await axiosInstance.get("Motels/" + motelId);
       const motel = res.data;
       setCurrentEditMotel(motel);
-      setOpenAddMotelDialog(true);
+      setOpenUpdateMotelDialog(true);
       setUpdateMotelPosition(null);
     } catch (err) {
       console.log(err);
     }
+  };
+
+  const handleClickUpdateRoomPopup = async (event) => {
+    try {
+      const roomId = event.target.dataset.id;
+      const res = await axiosInstance.get("Rooms/" + roomId);
+      const room = res.data;
+      setCurrentEditRoom(room);
+      setOpenUpdateRoomDialog(true);
+      setUpdateRoomPosition(null);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const handleClickDeleteRoomPopup = (event) => {
+    const roomId = event.target.dataset.id;
+    setCurrentDeleteRoomId(roomId);
+    setOpenDeleteRoomDialog(true);
   };
 
   const handleClickDeleteMotelPopup = async (event) => {
@@ -124,8 +155,25 @@ function AdminPage() {
       const res = await axiosInstance.delete("Motels/" + currentDeleteMotelId);
 
       toast({
-        title: "Xóa thành công",
+        title: "Xóa nhà trọ thành công",
+        description:
+          "Nhà trọ đã được xóa thành công, tất cả các phòng trọ thuộc nhà trọ cũng đã được xóa khỏi hệ thống.",
       });
+      navigate(0);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    try {
+      const res = await axiosInstance.delete("Rooms/" + currentDeleteRoomId);
+
+      toast({
+        title: "Thành công",
+        description: "Phòng trọ đã được xóa thành công.",
+      });
+      navigate(0);
     } catch (error) {
       console.log(error);
     }
@@ -199,6 +247,108 @@ function AdminPage() {
     });
   };
 
+  const onEachRoomFeature = (feature, layer) => {
+    const { properties } = feature;
+
+    const popupContent = `
+      <div>
+        <h3 style="font-weight: 700; font-size: 16px;">${
+          properties.motel.name
+        }</h3>
+        <div>
+          <strong>Mã phòng: </strong>
+          <span>${properties.id}</span>
+        </div>
+        <div style="margin-top: 4px">
+          <strong>Giá: </strong>
+          <span>
+            ${(properties.price * 1000).toLocaleString("it-IT", {
+              style: "currency",
+              currency: "VND",
+            })}
+          </span>
+        </div>
+
+        <div style="margin-top: 4px">
+          <strong>Sức chứa: </strong>
+          <span>${properties.capability}</span>
+        </div>
+
+        <div style="margin-top: 4px">
+          <strong>Tình trạng: </strong>
+          <span>${properties.isAvailable ? "Trống" : "Đã thuê"}</span>
+        </div>
+
+        <div style="margin-top: 4px">
+          <strong>Gác lửng: </strong>
+          <span>${properties.isMezzanine ? "Có" : "Không"}</span>
+        </div>
+
+        <div style="margin-top: 4px">
+          <strong>Mô tả: </strong>
+          <span>${properties.description}</span>
+        </div>
+        <button
+          style="
+            padding: 6px 12px; 
+            background-color: orange; 
+            color: white;
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer;"
+          type="button"
+          id="roomPopupUpdateBtn"
+          data-id=${properties.id}
+        >
+          Cập nhật thông tin
+        </button>
+
+        <button
+          style="
+            padding: 6px 12px; 
+            background-color: red; 
+            color: white;
+            border: none;
+            border-radius: 4px; 
+            cursor: pointer;"
+          type="button"
+          id="roomPopupDeleteBtn"
+          data-id=${properties.id}
+        >
+          Xóa phòng trọ
+        </button>
+      </div>
+    `;
+
+    layer.bindPopup(popupContent);
+
+    layer.on("popupopen", () => {
+      const updateButton = document.getElementById("roomPopupUpdateBtn");
+      const deleteButton = document.getElementById("roomPopupDeleteBtn");
+
+      if (updateButton) {
+        updateButton.addEventListener("click", handleClickUpdateRoomPopup);
+      }
+
+      if (deleteButton) {
+        deleteButton.addEventListener("click", handleClickDeleteRoomPopup);
+      }
+    });
+
+    layer.on("popupclose", () => {
+      const updateButton = document.getElementById("motelPopupUpdateBtn");
+      const deleteButton = document.getElementById("motelPopupDeleteBtn");
+
+      if (updateButton) {
+        updateButton.removeEventListener("click", () => {});
+      }
+
+      if (deleteButton) {
+        updateButton.removeEventListener("click", () => {});
+      }
+    });
+  };
+
   const handleCopyToClipBoard = (clickPosition) => {
     const text = `[${clickPosition.lng},${clickPosition.lat}]`;
     navigator.clipboard
@@ -211,13 +361,21 @@ function AdminPage() {
       });
   };
 
+  const handleClickCreatePopup = (e) => {
+    const geometryType = e.target.dataset.type;
+    if (geometryType === "Point") {
+      setOpenCreateMotelDialog(true);
+    } else {
+      setOpenCreateRoomDialog(true);
+    }
+  };
+
   return (
     <div className="relative">
       <MapContainer
         center={[10.030301, 105.772119]}
         zoom={15}
         className="w-full h-screen z-0"
-        key={parentMapKey}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -225,7 +383,7 @@ function AdminPage() {
         />
         {!loading && (
           <>
-            <GeoJSON data={roomGeoJson} />
+            <GeoJSON data={roomGeoJson} onEachFeature={onEachRoomFeature} />
             <GeoJSON data={motelGeoJson} onEachFeature={onEachMotelFeature} />
           </>
         )}
@@ -234,6 +392,7 @@ function AdminPage() {
           addFeature={addFeature}
           updateFeature={updateFeature}
           deleteFeature={deleteFeature}
+          handleClickCreatePopup={handleClickCreatePopup}
         />
 
         <MapClickPopup setPopupPosition={setClickPos} />
@@ -268,8 +427,8 @@ function AdminPage() {
         )}
 
         <Dialog
-          open={openAddMotelDialog}
-          onOpenChange={setOpenAddMotelDialog}
+          open={openUpdateMotelDialog}
+          onOpenChange={setOpenUpdateMotelDialog}
           key="updateMotelDialog"
         >
           <DialogContent className="sm:max-w-[425px]">
@@ -327,8 +486,7 @@ function AdminPage() {
                 name={currentEditMotel?.name}
                 description={currentEditMotel?.description}
                 id={currentEditMotel?.id}
-                setOpenAddMotelDialog={setOpenAddMotelDialog}
-                setParentMapKey={setParentMapKey}
+                setOpenUpdateMotelDialog={setOpenUpdateMotelDialog}
               />
             </ScrollArea>
           </DialogContent>
@@ -337,6 +495,7 @@ function AdminPage() {
         <Dialog
           open={openDeleteMotelDialog}
           onOpenChange={setOpenDeleteMotelDialog}
+          key="deleteMotelDialog"
         >
           <DialogContent>
             <DialogHeader>
@@ -354,6 +513,121 @@ function AdminPage() {
 
               <DialogClose asChild>
                 <Button variant="destructive" onClick={handleDeleteMotel}>
+                  Xóa
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={openCreateMotelDialog}
+          onOpenChange={setOpenCreateMotelDialog}
+          key="createMotelDialog"
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Thêm mới nhà trọ</DialogTitle>
+              <DialogDescription>
+                Thêm nhà trọ. Nhấn lưu khi điền đầy đủ các thông tin.
+              </DialogDescription>
+            </DialogHeader>
+
+            <CreateMotelForm
+              feature={currentAddFeature}
+              setOpenCreateMotelDialog={setOpenCreateMotelDialog}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={openCreateRoomDialog}
+          onOpenChange={setOpenCreateRoomDialog}
+          key="createRoomDialog"
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Thêm mới phòng trọ</DialogTitle>
+              <DialogDescription>
+                Thêm phòng trọ cho nhà trọ. Nhấn lưu khi điền đầy đủ các thông
+                tin.
+              </DialogDescription>
+            </DialogHeader>
+            <CreateRoomForm
+              feature={currentAddFeature}
+              setOpenCreateRoomDialog={setOpenCreateRoomDialog}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={openUpdateRoomDialog}
+          onOpenChange={setOpenUpdateRoomDialog}
+          key="updateRoomDialog"
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Cập nhật phòng trọ</DialogTitle>
+              <DialogDescription>
+                Cập nhật phòng trọ. Nhấn lưu khi điền đầy đủ các thông tin.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-[400px] w-full">
+              <MapContainer
+                center={[10.030301, 105.772119]}
+                zoom={14}
+                style={{ height: "300px", width: "100%" }}
+                scrollWheelZoom={false}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+
+                <DrawPolygonControl
+                  setUpdateRoomPosition={setUpdateRoomPosition}
+                />
+
+                {updateRoomPosition && <GeoJSON data={updateRoomPosition} />}
+              </MapContainer>
+
+              <Button
+                variant="destructive"
+                className="my-3"
+                onClick={() => setUpdateRoomPosition(null)}
+              >
+                Hủy chọn vị trí
+              </Button>
+
+              <UpdateRoomForm
+                feature={updateRoomPosition}
+                room={currentEditRoom}
+                setOpenUpdateRoomDialog={setOpenUpdateRoomDialog}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={openDeleteRoomDialog}
+          onOpenChange={setOpenDeleteRoomDialog}
+          key="deleteRoomDialog"
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Xóa phòng trọ</DialogTitle>
+              <DialogDescription>
+                Bạn có chắc chắn xóa phòng trọ không?
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="flex justify-end gap-3">
+              <DialogClose asChild>
+                <Button variant="outline">Hủy</Button>
+              </DialogClose>
+
+              <DialogClose asChild>
+                <Button variant="destructive" onClick={handleDeleteRoom}>
                   Xóa
                 </Button>
               </DialogClose>

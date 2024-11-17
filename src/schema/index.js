@@ -50,3 +50,20 @@ export const CreateMotelSchema = z.object({
     message: "Vui lòng nhập mô tả nhà trọ",
   }),
 });
+
+export const CreateRoomSchema = z.object({
+  price: z.coerce.number().int().min(1, {
+    message: "Giá phòng trọ phải lớn hơn 0",
+  }),
+  capability: z.coerce.number().int().min(1, {
+    message: "Sức chứa phòng trọ phải lớn hơn 0",
+  }),
+  motelId: z.coerce.number().int().min(1, {
+    message: "Mã nhà trọ phải lớn hơn 0",
+  }),
+  isMezzanine: z.boolean(),
+  isAvailable: z.boolean(),
+  description: z.string().min(1, {
+    message: "Vui lòng nhập mô tả phòng trọ",
+  }),
+});

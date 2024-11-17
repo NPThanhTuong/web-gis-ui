@@ -5,17 +5,11 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-draw";
 
-function DrawControl({
-  addFeature,
-  updateFeature,
-  deleteFeature,
-  handleClickCreatePopup,
-}) {
+function DrawPolygonControl({ setUpdateRoomPosition }) {
   const map = useMap();
   const featureGroupRef = useRef(new L.FeatureGroup());
 
   useEffect(() => {
-    // Add FeatureGroup to the map to store editable layers
     map.addLayer(featureGroupRef.current);
 
     // Initialize Leaflet Draw controls
@@ -28,7 +22,7 @@ function DrawControl({
         polyline: false,
         rectangle: false,
         circle: false,
-        marker: true,
+        marker: false,
         circlemarker: false,
       },
     });
@@ -36,54 +30,24 @@ function DrawControl({
 
     const handleDrawCreated = (event) => {
       const { layer } = event;
-      featureGroupRef.current.addLayer(layer);
+      // featureGroupRef.current.addLayer(layer);
 
       // Add unique identifier to the GeoJSON object
       const geoJson = layer.toGeoJSON();
       geoJson.properties = { ...geoJson.properties, id: layer._leaflet_id };
-      addFeature(geoJson);
-
-      // Bind a popup to the layer
-      const popupContent = `Feature ID: ${layer._leaflet_id}<br/>Type: ${geoJson.geometry.type} <br/> <button
-          style="
-            padding: 6px 12px; 
-            background-color: orange; 
-            color: white;
-            border: none;
-            border-radius: 4px; 
-            cursor: pointer;"
-          type="button"
-          id="motelPopupCreateBtn"
-          data-type=${geoJson.geometry.type}
-        >
-          Thêm thông tin
-        </button>`;
-      layer.bindPopup(popupContent);
-
-      layer.on("popupopen", () => {
-        const createButton = document.getElementById("motelPopupCreateBtn");
-        if (createButton)
-          createButton.addEventListener("click", handleClickCreatePopup);
-      });
-
-      layer.on("popupopen", () => {
-        const createButton = document.getElementById("motelPopupCreateBtn");
-        if (createButton) createButton.addEventListener("click", () => {});
-      });
+      setUpdateRoomPosition(geoJson);
     };
 
     const handleDrawEdited = (event) => {
       event.layers.eachLayer((layer) => {
         const geoJson = layer.toGeoJSON();
         geoJson.properties = { ...geoJson.properties, id: layer._leaflet_id };
-        updateFeature(geoJson);
+        setUpdateRoomPosition(geoJson);
       });
     };
 
     const handleDrawDeleted = (event) => {
-      event.layers.eachLayer((layer) => {
-        deleteFeature(layer._leaflet_id);
-      });
+      setUpdateRoomPosition(null);
     };
 
     map.on("draw:created", handleDrawCreated);
@@ -97,9 +61,9 @@ function DrawControl({
       map.removeControl(drawControl);
       map.removeLayer(featureGroupRef.current);
     };
-  }, [map, addFeature, updateFeature, deleteFeature]);
+  }, [map, setUpdateRoomPosition]);
 
   return null;
 }
 
-export default DrawControl;
+export default DrawPolygonControl;

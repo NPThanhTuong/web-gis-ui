@@ -15,62 +15,44 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { axiosInstance } from "@/configs/axiosConfig";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
-function UpdateMotelForm({
-  id,
-  name,
-  description,
-  lat,
-  lng,
-  setOpenUpdateMotelDialog,
-}) {
+function CreateMotelForm({ feature, setOpenCreateMotelDialog }) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const form = useForm({
     resolver: zodResolver(CreateMotelSchema),
     defaultValues: {
-      name,
-      description,
+      name: "",
+      description: "",
     },
   });
 
   const onSubmit = async (data) => {
-    setLoading(true);
-    let dataSubmit;
     try {
-      if (lat && lng) {
-        dataSubmit = {
-          userId: 1, // 1 is id of no user
-          ...data,
-          geom: JSON.stringify({
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: {
-                  coordinates: [lng, lat],
-                  type: "Point",
-                },
-              },
-            ],
-          }),
-        };
-      } else {
-        dataSubmit = {
-          userId: 1, // 1 is id of no user
-          ...data,
-        };
-      }
+      setLoading(true);
 
-      const res = await axiosInstance.put("Motels/" + id, dataSubmit);
+      const dataSubmit = {
+        userId: 1, // 1 is id of no user
+        name: data.name,
+        description: data.description,
+        geom: JSON.stringify({
+          type: "FeatureCollection",
+          features: [feature],
+        }),
+      };
+
+      const res = await axiosInstance.post("Motels", dataSubmit);
 
       toast({
         title: "Cập nhật thành công",
         description: "Thông tin nhà trọ đã được hệ thống ghi nhận",
       });
 
-      setOpenUpdateMotelDialog(false);
+      setOpenCreateMotelDialog(false);
+      navigate(0);
     } catch (error) {
       console.log(error);
     }
@@ -98,6 +80,7 @@ function UpdateMotelForm({
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="description"
@@ -115,6 +98,7 @@ function UpdateMotelForm({
               )}
             />
           </div>
+
           <Button type="submit" className="w-full">
             {loading ? "Đang tải..." : "Lưu"}
           </Button>
@@ -124,4 +108,4 @@ function UpdateMotelForm({
   );
 }
 
-export default UpdateMotelForm;
+export default CreateMotelForm;
